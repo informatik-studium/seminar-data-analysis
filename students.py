@@ -141,6 +141,13 @@ def create_gif():
     start_date = datetime(2023, 12, 9)
     end_date = datetime(2023, 12, 10)
 
+    # create directory for gif frames
+    if not os.path.exists("gif_frames"):
+        os.makedirs("gif_frames")
+    else:
+        for filename in os.listdir("gif_frames"):
+            os.remove(f"gif_frames/{filename}")
+
     # load radar data
     radar_data, time_data = read_radar_data(path, start_date, end_date)
    
@@ -220,6 +227,9 @@ def create_gif():
     # remove images
     for filename in os.listdir("gif_frames"):
         os.remove(f"gif_frames/{filename}")
+
+    # remove directory
+    os.rmdir("gif_frames")
 
 
 def print_uncompressed_filesize():
