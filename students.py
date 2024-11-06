@@ -8,6 +8,7 @@ from tqdm import tqdm
 import json
 from pprint import pprint
 from matplotlib import pyplot as plt
+import matplotlib.ticker as mticker  
 import imageio
 import os
 
@@ -137,8 +138,8 @@ def get_german_border():
 
 def create_gif():
     path = Path("data")
-    start_date = datetime(2023, 12, 19)
-    end_date = datetime(2023, 12, 20)
+    start_date = datetime(2023, 12, 9)
+    end_date = datetime(2023, 12, 10)
 
     # load radar data
     radar_data, time_data = read_radar_data(path, start_date, end_date)
@@ -152,20 +153,55 @@ def create_gif():
     # load german border
     border_x, border_y = get_german_border() # (B,), (B,)
 
+    # change nan values to 0
+    radar_data_wgs84 = np.nan_to_num(radar_data_wgs84)
+
+    vmin = 0.0
+    vmax = np.max(radar_data_wgs84[0])
+    vmax_factor = 0.95
+
     # plot radar data
     plt.ion()
     for i in range(radar_data_wgs84.shape[0]):
 
         plt.clf()
 
-        # set aspect ratio to be equal
-        plt.gca().set_aspect('equal', adjustable='box')
+        # update vmax
+        if np.max(radar_data_wgs84[i]) > vmax:
+            vmax = np.max(radar_data_wgs84[i])
+        else:
+            vmax = vmax * vmax_factor + np.max(radar_data_wgs84[i]) * (1 - vmax_factor)
 
-        plt.imshow(radar_data_wgs84[i], extent=[grid[0, 0, 1], grid[0, -1, 1], grid[0, 0, 0], grid[-1, 0, 0]])
-        plt.plot(border_x, border_y)
+        plt.imshow(radar_data_wgs84[i], extent=[grid[0, 0, 1], grid[0, -1, 1], grid[0, 0, 0], grid[-1, 0, 0]], cmap="Blues", vmin=vmin, vmax=vmax)
+        cbar = plt.colorbar(cmap="Blues")
+        cbar.set_label("mm")
+
+        plt.plot(border_x, border_y, color="black")
         plt.title(str(time_data[i])[0:16].replace("T", " "))
         plt.xlabel("Longitude")
         plt.ylabel("Latitude")
+
+        plt.gca().yaxis.set_major_formatter(mticker.FormatStrFormatter('%.1f °N'))
+        plt.gca().xaxis.set_major_formatter(mticker.FormatStrFormatter('%.1f °E'))
+
+        # scatter city of Wuppertal
+        plt.scatter(7.150829, 51.256176, color="red", s=50, label="Wuppertal")
+
+
+        # set aspect ratio to be equal
+        plt.gca().set_aspect(1.43)
+
+        # Calculate 10% of the range in each direction
+        x_range = max(border_x) - min(border_x)
+        y_range = max(border_y) - min(border_y)
+        x_padding = x_range * 0.1
+        y_padding = y_range * 0.1
+
+        # Set x-axis limits with 10% padding on both sides
+        plt.xlim([min(border_x) - x_padding, max(border_x) + x_padding])
+
+        # Set y-axis limits with 10% padding on both sides
+        plt.ylim([min(border_y) - y_padding, max(border_y) + y_padding])
 
 
         # save image to file
@@ -221,9 +257,87 @@ def print_uncompressed_filesize():
     print(f"Total size of uncompressed radar data: {total_size_gb:.2f} GB")
 
 
+def plot_range():
+    path = Path("data")
+    start_date = datetime(2023, 12, 9)
+    end_date = datetime(2023, 12, 10)
+
+    # load radar data
+    radar_data, time_data = read_radar_data(path, start_date, end_date)
+
+    # change NAN values to 0
+    radar_data = np.nan_to_num(radar_data)
+   
+    # project radar data to WGS84
+    grid = get_wgs84_grid() # (900, 900, 2)
+    radar_data_wgs84 = np.zeros((radar_data.shape[0], 900, 900))
+    for i in range(radar_data.shape[0]):
+        radar_data_wgs84[i] = radar_data[i]
+
+    # load german border
+    border_x, border_y = get_german_border() # (B,), (B,)
+
+    # find the time where the maximum rainfall was recorded
+    # if it is not i then continue
+    max_mean = 0
+    for j in range(radar_data_wgs84.shape[0]):
+        if np.mean(radar_data_wgs84[j]) > max_mean:
+            max_mean = np.mean(radar_data_wgs84[j])
+            max_index = j
+    print(max_index)
+
+    # plot radar data
+    vmin = 0.0
+    vmax = np.max(radar_data_wgs84[max_index])
+    fig = plt.figure(figsize=(8, 8))
+
+    for i in range(radar_data_wgs84.shape[0]):
+
+        if i != max_index:
+            continue
+
+        plt.imshow(radar_data_wgs84[i], extent=[grid[0, 0, 1], grid[0, -1, 1], grid[0, 0, 0], grid[-1, 0, 0]], cmap="Blues", vmin=vmin, vmax=vmax)
+        cbar = plt.colorbar(cmap="Blues")
+        cbar.set_label("mm")
+
+        plt.plot(border_x, border_y, color="black")
+        plt.title(str(time_data[i])[0:16].replace("T", " "))
+        plt.xlabel("Longitude")
+        plt.ylabel("Latitude")
+
+        plt.gca().yaxis.set_major_formatter(mticker.FormatStrFormatter('%.1f °N'))
+        plt.gca().xaxis.set_major_formatter(mticker.FormatStrFormatter('%.1f °E'))
+
+        # scatter city of Wuppertal
+        plt.scatter(7.150829, 51.256176, color="red", s=50, label="Wuppertal")
+
+
+        # set aspect ratio to be equal
+        plt.gca().set_aspect(1.43)
+
+        # Calculate 10% of the range in each direction
+        x_range = max(border_x) - min(border_x)
+        y_range = max(border_y) - min(border_y)
+        x_padding = x_range * 0.1
+        y_padding = y_range * 0.1
+
+        # Set x-axis limits with 10% padding on both sides
+        plt.xlim([min(border_x) - x_padding, max(border_x) + x_padding])
+
+        # Set y-axis limits with 10% padding on both sides
+        plt.ylim([min(border_y) - y_padding, max(border_y) + y_padding])
+
+        # colorbar with label
+
+        plt.show()
+
+
+
 if __name__ == "__main__":
 
-    #create_gif()
+    create_gif()
 
-    print_uncompressed_filesize()
+    #print_uncompressed_filesize()
+
+    #plot_range()
     
