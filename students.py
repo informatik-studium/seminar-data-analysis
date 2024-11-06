@@ -128,7 +128,7 @@ def read_radar_data(path: Path, start_date: datetime, end_date: datetime) -> tup
 
 
 def get_german_border():
-    path = Path("germany.json")
+    path = Path("borders/germany.json")
     with open(path, "r") as file:
         data = json.load(file)
     coordinates = data["features"][0]["geometry"]["coordinates"][0]
