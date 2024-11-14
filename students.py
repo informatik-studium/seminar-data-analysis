@@ -9,7 +9,7 @@ import json
 from pprint import pprint
 from matplotlib import pyplot as plt
 import matplotlib.ticker as mticker  
-import imageio
+import imageio.v2 as imageio
 import os
 
 
@@ -106,7 +106,8 @@ def read_radar_data(path: Path, start_date: datetime, end_date: datetime) -> tup
     # read radar data
     radar_data = []
     time_data = []
-    for file in tqdm(files, total=len(files)):
+
+    for file in tqdm(files, total=len(files), desc='        progress'):
         time_file = str(file).replace("_rw_values.npz", "_time.npz")
         time = np.load(time_file, allow_pickle=True)["arr_0"]
         bool_time_filter = (time >= start_date) & (time <= end_date)
@@ -136,10 +137,56 @@ def get_german_border():
     return coordinates[:, 0], coordinates[:, 1]
 
 
+def plot_state_borders_on_axis(ax=plt, state_annotations=True, color="black"):
+    states_abbreviation_lookup = {
+        "Baden-Württemberg": "BW",
+        "Bayern": "BY",
+        "Berlin": "BE",
+        "Brandenburg": "BB",
+        "Bremen": "HB",
+        "Hamburg": "HH",
+        "Hessen": "HE",
+        "Mecklenburg-Vorpommern": "MV",
+        "Niedersachsen": "NI",
+        "Nordrhein-Westfalen": "NRW",
+        "Rheinland-Pfalz": "RP",
+        "Saarland": "SL",
+        "Sachsen": "SN",
+        "Sachsen-Anhalt": "ST",
+        "Schleswig-Holstein": "SH",
+        "Thüringen": "TH"
+    }
+    path = Path("borders/german_states.json")
+    with open(path, mode="r", encoding="utf-8") as file:
+        data = json.load(file)
+    data = data["features"]
+    for state_data in data:
+        state_name = state_data["properties"]["name"]
+        poly_type = state_data["geometry"]["type"]
+        state_polygons = state_data["geometry"]["coordinates"]
+        if poly_type == 'Polygon':
+            for polygon in state_polygons:
+                x, y = np.array(polygon).T
+                ax.plot(x, y, color=color)
+                if state_annotations:
+                    ax.annotate(states_abbreviation_lookup[state_name], (np.mean(x), np.mean(y)), color=color, ha='center', va='center')
+        elif poly_type == 'MultiPolygon':
+            tmp = True
+            for polygon in state_polygons:
+                for poly in polygon:
+                    x, y = np.array(poly).T
+                    ax.plot(x, y, color=color)
+                    if tmp and state_annotations:
+                        ax.annotate(states_abbreviation_lookup[state_name], (np.mean(x), np.mean(y)), color=color, ha='center', va='center')
+                    tmp = False
+
+
 def create_gif():
     path = Path("data")
     start_date = datetime(2023, 12, 9)
     end_date = datetime(2023, 12, 10)
+
+    print(f'[GIF] Creating gif from radar data between {start_date} and {end_date}')
 
     # create directory for gif frames
     if not os.path.exists("gif_frames"):
@@ -149,6 +196,7 @@ def create_gif():
             os.remove(f"gif_frames/{filename}")
 
     # load radar data
+    print("\tLoading radar data...")
     radar_data, time_data = read_radar_data(path, start_date, end_date)
    
     # project radar data to WGS84
@@ -183,7 +231,7 @@ def create_gif():
         cbar = plt.colorbar(cmap="Blues")
         cbar.set_label("mm")
 
-        plt.plot(border_x, border_y, color="black")
+        plot_state_borders_on_axis(ax=plt, state_annotations=True, color="black")
         plt.title(str(time_data[i])[0:16].replace("T", " "))
         plt.xlabel("Longitude")
         plt.ylabel("Latitude")
@@ -218,11 +266,15 @@ def create_gif():
     plt.ioff()
     plt.close()
 
+    print(f"\tCreated {radar_data_wgs84.shape[0]} frames")
+
     # create gif from images
     images = []
     for filename in os.listdir("gif_frames"):
         images.append(imageio.imread(f"gif_frames/{filename}"))
     imageio.mimsave('radar_data.gif', images)
+
+    print("\tCreated gif. Cleaning up...")
 
     # remove images
     for filename in os.listdir("gif_frames"):
@@ -230,6 +282,7 @@ def create_gif():
 
     # remove directory
     os.rmdir("gif_frames")
+    print("\tDone!")
 
 
 def print_uncompressed_filesize():
@@ -343,6 +396,8 @@ def plot_range():
 
 
 
+
+
 if __name__ == "__main__":
 
     create_gif()
@@ -350,4 +405,3 @@ if __name__ == "__main__":
     #print_uncompressed_filesize()
 
     #plot_range()
-    
