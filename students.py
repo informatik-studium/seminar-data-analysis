@@ -11,180 +11,18 @@ from matplotlib import pyplot as plt
 import matplotlib.ticker as mticker  
 import imageio.v2 as imageio
 import os
+import time
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 
-
-RADOLAN_WKT = """PROJCS["Radolan projection",
-GEOGCS["Radolan Coordinate System",
-    DATUM["Radolan Kugel",
-        SPHEROID["Erdkugel", 6370040.0, 0.0]
-    ],
-    PRIMEM["Greenwich", 0.0, AUTHORITY["EPSG","8901"]],
-    UNIT["degree", 0.017453292519943295],
-    AXIS["Longitude", EAST],
-    AXIS["Latitude", NORTH]
-],
-PROJECTION["Stereographic_North_Pole"],
-PARAMETER["central_meridian", 10.0],
-PARAMETER["Standard_Parallel_1", 60.0],
-PARAMETER["scale_factor", 1.0],
-PARAMETER["false_easting", 0.0],
-PARAMETER["false_northing", 0.0],
-UNIT["km", 1000.0],
-AXIS["X", EAST],
-AXIS["Y", NORTH],
-AUTHORITY["EPSG","1000001"]
-]
-"""
-
-
-def convert_radolan_to_wgs84(x: np.ndarray, y: np.ndarray):
-    """
-    Converts coordinates from the Radolan coordinate reference system (CRS) to the WGS84 CRS.
-
-    Parameters:
-    x (np.ndarray): Array of x-coordinates in the Radolan CRS.
-    y (np.ndarray): Array of y-coordinates in the Radolan CRS.
-
-    Returns:
-    Tuple[np.ndarray, np.ndarray]: Tuple containing the converted x-coordinates and y-coordinates in the WGS84 CRS.
-    """
-
-    radolan_crs = CRS.from_wkt(RADOLAN_WKT)
-    wgs84_crs = CRS.from_epsg(4326)
-
-    transformer = pyproj.Transformer.from_crs(radolan_crs, wgs84_crs, always_xy=True)
-
-    return transformer.transform(x, y)
-
-
-def get_wgs84_grid():
-    """
-    Returns a grid of WGS84 coordinates.
-
-    Returns:
-        wgs84_grid (numpy.ndarray): A grid of WGS84 coordinates with shape (900, 900, 2).
-                                    The first dimension represents latitude, the second dimension represents longitude,
-                                    and the third dimension represents the coordinates.
-    """
-    x_radolan_coords = np.arange(-522.9621669218559, 376.0378330781441+0.1, 1.0)
-    y_radolan_coords = np.arange(-4658.144724265571,  -3759.1447242655713+0.1, 1.0)
-
-    wgs84_coords = convert_radolan_to_wgs84(x_radolan_coords, y_radolan_coords)
-    wgs84_coords = np.array(wgs84_coords).T
-    wgs84_coords = np.flip(wgs84_coords, axis=1)
-
-    lat = np.repeat(wgs84_coords[:, 0], 900).reshape(900, 900)
-    lon = np.tile(wgs84_coords[:, 1], 900).T.reshape(900, 900)
-
-    wgs84_grid = np.stack([lat, lon], axis=2)
-    return wgs84_grid
-
-
-def read_radar_data(path: Path, start_date: datetime, end_date: datetime) -> tuple[np.ndarray, np.ndarray]:
-    start_year = start_date.year
-    end_year = end_date.year
-
-    path_list = []
-    for year in range(start_year, end_year+1):
-        path_list.append(path.joinpath(str(year)))
-    
-    files = []
-    for path_year in path_list:
-        # get all files in the directory
-        all_files_year = list(path_year.glob("*.npz"))
-        log.debug(f"Found {len(all_files_year)} files in {path_year}")
-        all_files_year = [file for file in all_files_year if not str(file.name).endswith("time.npz")]
-        files.extend(all_files_year)
-    
-    log.info(f"Found {len(files)} time files")
-    if len(files) == 0:
-        raise Exception(f"No files found for the date range {start_date} to {end_date}. You may need to download more data first.")
-
-    start_date = np.datetime64(start_date)
-    end_date = np.datetime64(end_date)
-
-    # read radar data
-    radar_data = []
-    time_data = []
-
-    for file in tqdm(files, total=len(files), desc='        progress'):
-        time_file = str(file).replace("_rw_values.npz", "_time.npz")
-        time = np.load(time_file, allow_pickle=True)["arr_0"]
-        bool_time_filter = (time >= start_date) & (time <= end_date)
-        time = time[bool_time_filter]
-
-        # skip file if no data is available
-        if len(time) == 0:
-            continue
-        data = np.load(file, allow_pickle=True)["arr_0"]
-        data = data[bool_time_filter]
-
-        radar_data.append(data)
-        time_data.append(time)
-    
-    np_time_data =  np.concatenate(time_data)
-    np_radar_data = np.concatenate(radar_data)
-
-    return np_radar_data, np_time_data
-
-
-def get_german_border():
-    path = Path("borders/germany.json")
-    with open(path, "r") as file:
-        data = json.load(file)
-    coordinates = data["features"][0]["geometry"]["coordinates"][0]
-    coordinates = np.array(coordinates)[0] # (2374, 2)
-    return coordinates[:, 0], coordinates[:, 1]
-
-
-def plot_state_borders_on_axis(ax=plt, state_annotations=True, color="black"):
-    states_abbreviation_lookup = {
-        "Baden-Württemberg": "BW",
-        "Bayern": "BY",
-        "Berlin": "BE",
-        "Brandenburg": "BB",
-        "Bremen": "HB",
-        "Hamburg": "HH",
-        "Hessen": "HE",
-        "Mecklenburg-Vorpommern": "MV",
-        "Niedersachsen": "NI",
-        "Nordrhein-Westfalen": "NRW",
-        "Rheinland-Pfalz": "RP",
-        "Saarland": "SL",
-        "Sachsen": "SN",
-        "Sachsen-Anhalt": "ST",
-        "Schleswig-Holstein": "SH",
-        "Thüringen": "TH"
-    }
-    path = Path("borders/german_states.json")
-    with open(path, mode="r", encoding="utf-8") as file:
-        data = json.load(file)
-    data = data["features"]
-    for state_data in data:
-        state_name = state_data["properties"]["name"]
-        poly_type = state_data["geometry"]["type"]
-        state_polygons = state_data["geometry"]["coordinates"]
-        if poly_type == 'Polygon':
-            for polygon in state_polygons:
-                x, y = np.array(polygon).T
-                ax.plot(x, y, color=color)
-                if state_annotations:
-                    ax.annotate(states_abbreviation_lookup[state_name], (np.mean(x), np.mean(y)), color=color, ha='center', va='center')
-        elif poly_type == 'MultiPolygon':
-            tmp = True
-            for polygon in state_polygons:
-                for poly in polygon:
-                    x, y = np.array(poly).T
-                    ax.plot(x, y, color=color)
-                    if tmp and state_annotations:
-                        ax.annotate(states_abbreviation_lookup[state_name], (np.mean(x), np.mean(y)), color=color, ha='center', va='center')
-                    tmp = False
+from utils import *
+from plotting_utils import *
 
 
 def create_gif():
-    path = Path("data")
-    start_date = datetime(2023, 12, 9)
-    end_date = datetime(2023, 12, 10)
+    path = Path("F:\\radar_data")
+    start_date = datetime(2019, 1, 1)
+    end_date = datetime(2019, 12, 31)
 
     print(f'[GIF] Creating gif from radar data between {start_date} and {end_date}')
 
@@ -285,43 +123,8 @@ def create_gif():
     print("\tDone!")
 
 
-def print_uncompressed_filesize():
-
-    total_size_gb = 0
-
-    path_list = []
-    path = Path("data")
-    for year in range(2006, 2023+1):
-        path_list.append(path.joinpath(str(year)))
-    
-    files = []
-    for path_year in path_list:
-        all_files_year = list(path_year.glob("*.npz"))
-        all_files_year = [file for file in all_files_year if not str(file.name).endswith("time.npz")]
-        files.extend(all_files_year)
-    
-    # read radar data
-    radar_data = []
-    time_data = []
-    for file in tqdm(files, total=len(files)):
-        time_file = str(file).replace("_rw_values.npz", "_time.npz")
-        time = np.load(time_file, allow_pickle=True)["arr_0"]
-
-        # skip file if no data is available
-        if len(time) == 0:
-            continue
-        data = np.load(file, allow_pickle=True)["arr_0"]
-
-        # compute size in GB
-        size = data.size * data.itemsize
-        size_gb = size / 1e9
-        total_size_gb += size_gb
-
-    print(f"Total size of uncompressed radar data: {total_size_gb:.2f} GB")
-
-
 def plot_range():
-    path = Path("data")
+    path = Path("F:\\radar_data")
     start_date = datetime(2023, 12, 9)
     end_date = datetime(2023, 12, 10)
 
@@ -336,9 +139,6 @@ def plot_range():
     radar_data_wgs84 = np.zeros((radar_data.shape[0], 900, 900))
     for i in range(radar_data.shape[0]):
         radar_data_wgs84[i] = radar_data[i]
-
-    # load german border
-    border_x, border_y = get_german_border() # (B,), (B,)
 
     # find the time where the maximum rainfall was recorded
     # if it is not i then continue
@@ -363,7 +163,7 @@ def plot_range():
         cbar = plt.colorbar(cmap="Blues")
         cbar.set_label("mm")
 
-        plt.plot(border_x, border_y, color="black")
+        plot_german_border_on_axis(ax=plt, color="black")
         plt.title(str(time_data[i])[0:16].replace("T", " "))
         plt.xlabel("Longitude")
         plt.ylabel("Latitude")
@@ -378,30 +178,145 @@ def plot_range():
         # set aspect ratio to be equal
         plt.gca().set_aspect(1.43)
 
-        # Calculate 10% of the range in each direction
-        x_range = max(border_x) - min(border_x)
-        y_range = max(border_y) - min(border_y)
-        x_padding = x_range * 0.1
-        y_padding = y_range * 0.1
-
-        # Set x-axis limits with 10% padding on both sides
-        plt.xlim([min(border_x) - x_padding, max(border_x) + x_padding])
-
-        # Set y-axis limits with 10% padding on both sides
-        plt.ylim([min(border_y) - y_padding, max(border_y) + y_padding])
-
-        # colorbar with label
-
         plt.show()
 
 
+def compute_precipitation(year_month_tuple):
+    year, month = year_month_tuple
+    """Worker function to compute average precipitation for a given year and month."""
+    start_date = datetime(year, month, 1)
+    end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
 
+    # Load radar data
+    radar_data, _ = read_radar_data(start_date, end_date)
+    #radar_data = np.nan_to_num(radar_data)
+
+    # Compute total precipitation
+    radar_data[:, get_germany_mask()] = np.nan # aplly mask
+    inner = np.nanmean(radar_data, axis=(1, 2), dtype=np.float64) # mean over space
+    avg_precip = np.nansum(inner) # sum over time
+
+    # Comute total precipitation of NRW
+    radar_data[:, get_NRW_mask()] = np.nan # aplly mask
+    inner = np.nanmean(radar_data, axis=(1, 2), dtype=np.float64) # mean over space
+    nrw_precip = np.nansum(inner) # sum over time
+
+    print(f"Year: {year}, Month: {month}, Avg. Precipitation: {avg_precip:.2f} mm, NRW Precipitation: {nrw_precip:.2f} mm")
+    return year, month, avg_precip, nrw_precip
+
+
+def plot_avg_precipitation_per_month(max_parallel_processes=6):
+    """Compute and plot average monthly precipitation per square meter."""
+    start_time = time.perf_counter()
+
+    # Prepare tasks
+    years = range(2006, 2024)
+    months = range(1, 13)
+    tasks = [(year, month) for year in years for month in months]
+
+    #result = compute_precipitation(tasks[0])
+    #print(result)
+    #exit()
+
+    # Process tasks in parallel
+    results = []
+    with ProcessPoolExecutor(max_workers=max_parallel_processes) as executor:
+        results = list(executor.map(compute_precipitation, tasks))
+
+    # Aggregate results
+    data = [[] for _ in range(12)]
+    data_nrw = [[] for _ in range(12)]
+    for _, month, value, value_nrw in results:
+        data[month - 1].append(value)
+        data_nrw[month - 1].append(value_nrw)
+    data = np.array(data)
+    data_nrw = np.array(data_nrw)
+    print(f'Elapsed time: {time.perf_counter() - start_time:.2f} s')
+    
+    # plot average precipitation per month
+    months_str = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    plt.boxplot(data.T, labels=months_str)
+    plt.plot(months, np.mean(data_nrw, axis=1), label='NRW mean', color='red')
+    plt.xlabel("Month")
+    plt.ylabel("precipitation [mm]")
+    plt.title("Average monthly precipitation per square meter in Germany")
+    plt.legend()
+    plt.show()
+
+    # plot average precipitation per year as bar chart
+    years = [str(year) for year in range(2006, 2024)]
+    fig = plt.figure(figsize=(10, 5))
+    plt.bar(years, np.sum(data, axis=0), color="blue", label="Germany")
+    plt.plot(years, np.sum(data_nrw, axis=0), color="red", label="NRW")
+    plt.xlabel("Year")
+    plt.ylabel("precipitation [mm]")
+    plt.title("Average yearly precipitation per square meter")
+    plt.legend()
+    plt.show()
+
+
+def plot_average_percipitation_on_map():
+    data = []
+    for year in range(2006, 2022+1):
+        for month in range(1, 12+1):
+            try:
+                path = Path(f"cum_precipitation_per_moth/{year}/{month}.npy")
+                data.append(np.load(path))
+            except Exception as e:
+                print(e)
+                continue
+    data = np.array(data)
+    print(data.shape)
+
+    data = np.mean(data, axis=0)
+    print(data.shape)
+
+    # limit values to 200
+    data[data > 200] = 200
+
+    # project radar data to WGS84
+    grid = get_wgs84_grid() # (900, 900, 2)
+    
+    # load german border
+    border_x, border_y = get_german_border() # (B,), (B,)
+
+    # plot radar data
+    vmin = 0.0
+    vmax = np.max(data)
+    fig = plt.figure(figsize=(8, 8))
+
+    plt.imshow(data, extent=[grid[0, 0, 1], grid[0, -1, 1], grid[0, 0, 0], grid[-1, 0, 0]], cmap="Blues", vmin=vmin, vmax=vmax)
+    cbar = plt.colorbar(cmap="Blues")
+    cbar.set_label("mm")
+
+    #plt.plot(border_x, border_y, color="black")
+    plot_state_borders_on_axis(ax=plt, state_annotations=False, color="black")
+    plt.title("Average precipitation per month")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+
+    plt.gca().yaxis.set_major_formatter(mticker.FormatStrFormatter('%.1f °N'))
+    plt.gca().xaxis.set_major_formatter(mticker.FormatStrFormatter('%.1f °E'))
+
+    # scatter city of Wuppertal
+    plt.scatter(7.150829, 51.256176, color="red", s=50, label="Wuppertal")
+
+    # set aspect ratio to be equal
+    plt.gca().set_aspect(1.43)
+
+    # Calculate 10% of the range in each direction
+    x_range = max(border_x) - min(border_x)
+    y_range = max(border_y) - min(border_y)
+    x_padding = x_range * 0.1
+    y_padding = y_range * 0.1
+
+    # Set x-axis limits with 10% padding on both sides
+    plt.xlim([min(border_x) - x_padding, max(border_x) + x_padding])
+    plt.ylim([min(border_y) - y_padding, max(border_y) + y_padding])
+
+    plt.show()
 
 
 if __name__ == "__main__":
 
-    create_gif()
-
-    #print_uncompressed_filesize()
-
-    #plot_range()
+    plot_avg_precipitation_per_month()
