@@ -203,8 +203,6 @@ def compute_precipitation(year_month_tuple):
 
     print(f"Year: {year}, Month: {month}, Avg. Precipitation: {avg_precip:.2f} mm, NRW Precipitation: {nrw_precip:.2f} mm")
     return year, month, avg_precip, nrw_precip
-
-
 def plot_avg_precipitation_per_month(max_parallel_processes=6):
     """Compute and plot average monthly precipitation per square meter."""
     start_time = time.perf_counter()
@@ -317,6 +315,67 @@ def plot_average_percipitation_on_map():
     plt.show()
 
 
+def compute_daily_precipitation(year_month_tuple):
+    year, month = year_month_tuple
+    """Worker function to compute average precipitation for a given year and month."""
+    start_date = datetime(year, month, 1)
+    end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+
+    # Load radar data
+    radar_data, _ = read_radar_data(start_date, end_date)
+    #radar_data = np.nan_to_num(radar_data)
+
+    # Compute total precipitation
+    radar_data[:, get_germany_mask()] = np.nan # aplly mask
+    inner = np.nanmean(radar_data, axis=(1, 2), dtype=np.float64) # mean over space
+
+    # cut some data at the end off, so that we have a multiple of 24
+    tmp = inner.shape[0] % 24
+    if tmp != 0:
+        inner = inner[:-tmp]
+
+    # sum over 24 consecutive hours
+    daily_precip = np.nansum(inner.reshape(-1, 24), axis=1) # sum over time
+    print(f"Year: {year}, Month: {month}, Daily Precipitation: {daily_precip}")
+    return year, month, daily_precip
+def plot_daily_precipitation(max_parallel_processes=6):
+    """Compute and plot average monthly precipitation per square meter."""
+    start_time = time.perf_counter()
+
+    # Prepare tasks
+    years = range(2006, 2024)
+    months = range(1, 13)
+    tasks = [(year, month) for year in years for month in months]
+
+    #result = compute_daily_precipitation(tasks[0])
+    #print(result)
+    #exit()
+
+    # Process tasks in parallel
+    results = []
+    with ProcessPoolExecutor(max_workers=max_parallel_processes) as executor:
+        results = list(executor.map(compute_daily_precipitation, tasks))
+
+    # Aggregate results
+    data = []
+    for y, m, values in results:
+        data += list(values)
+        print(f"Year: {y}, \tMonth: {m}, \tDaily Precipitation: {values}")
+    data = np.array(data)
+
+    print(f'Elapsed time: {time.perf_counter() - start_time:.2f} s')
+
+    # save data to file
+    np.save("daily_precipitation.npy", data)
+
+    # plot daily precipitation
+    plt.plot(data)
+    plt.xlabel("Day")
+    plt.ylabel("precipitation [mm]")
+    plt.title("Daily precipitation in Germany")
+    plt.show()
+
+
 if __name__ == "__main__":
 
-    plot_avg_precipitation_per_month()
+    plot_daily_precipitation()
