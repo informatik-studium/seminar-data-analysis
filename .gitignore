@@ -165,3 +165,5 @@ data/
 *.npz
 *.npy
 topology/
+gif_frames/
+future/
