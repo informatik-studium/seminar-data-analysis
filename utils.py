@@ -133,10 +133,13 @@ def read_radar_data(start_date: datetime, end_date: datetime) -> tuple[np.ndarra
         radar_data.append(data)
         time_data.append(time)
     
+    if len(time_data) == 0:
+        raise Exception(f"No data found for the date range {start_date} to {end_date}. You may need to download more data first.")
+    
     np_time_data =  np.concatenate(time_data)
     np_radar_data = np.concatenate(radar_data)
 
-    return np_radar_data, np_time_data
+    return np_radar_data.astype(np.float32), np_time_data
 
 
 def print_uncompressed_filesize():
