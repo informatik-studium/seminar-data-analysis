@@ -10,6 +10,9 @@ from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
 
 
+PATH_TO_UNCOMPRESSED_DATA = Path("F:\\radar_data")
+
+
 RADOLAN_WKT = """PROJCS["Radolan projection",
 GEOGCS["Radolan Coordinate System",
     DATUM["Radolan Kugel",
@@ -34,7 +37,7 @@ AUTHORITY["EPSG","1000001"]
 """
 
 
-def convert_radolan_to_wgs84(x: np.ndarray, y: np.ndarray):
+def convert_radolan_to_wgs84(x: np.ndarray, y: np.ndarray, prj: str = None) -> tuple[np.ndarray, np.ndarray]:
     """
     Converts coordinates from the Radolan coordinate reference system (CRS) to the WGS84 CRS.
 
@@ -45,8 +48,10 @@ def convert_radolan_to_wgs84(x: np.ndarray, y: np.ndarray):
     Returns:
     Tuple[np.ndarray, np.ndarray]: Tuple containing the converted x-coordinates and y-coordinates in the WGS84 CRS.
     """
-
-    radolan_crs = CRS.from_wkt(RADOLAN_WKT)
+    if not prj == '':
+        radolan_crs = CRS.from_wkt(prj)
+    else:
+        radolan_crs = CRS.from_wkt(RADOLAN_WKT)
     wgs84_crs = CRS.from_epsg(4326)
 
     transformer = pyproj.Transformer.from_crs(radolan_crs, wgs84_crs, always_xy=True)
@@ -54,7 +59,7 @@ def convert_radolan_to_wgs84(x: np.ndarray, y: np.ndarray):
     return transformer.transform(x, y)
 
 
-def get_wgs84_grid():
+def get_wgs84_grid(prj: str = '') -> np.ndarray:
     """
     Returns a grid of WGS84 coordinates.
 
@@ -63,10 +68,19 @@ def get_wgs84_grid():
                                     The first dimension represents latitude, the second dimension represents longitude,
                                     and the third dimension represents the coordinates.
     """
-    x_radolan_coords = np.arange(-522.9621669218559, 376.0378330781441+0.1, 1.0)
-    y_radolan_coords = np.arange(-4658.144724265571,  -3759.1447242655713+0.1, 1.0)
+    if prj == '':
+        x_radolan_coords = np.arange(-522.9621669218559, 376.0378330781441+0.1, 1.0)
+        y_radolan_coords = np.arange(-4658.144724265571,  -3759.1447242655713+0.1, 1.0)
+    else:
+        scaling = 1000.0 # (meter -> km)
+        size_x = 900 # size of the grid in x-direction
+        size_y = 900 # size of the grid in y-direction
+        easting = 160 # distance from the central meridian in km
+        northing = 5800 # distance from equator in km
+        x_radolan_coords = np.arange(easting*size_x, easting*size_x + size_x*scaling, scaling)
+        y_radolan_coords = np.arange(northing*size_x, northing*size_x + size_y*scaling, scaling)
 
-    wgs84_coords = convert_radolan_to_wgs84(x_radolan_coords, y_radolan_coords)
+    wgs84_coords = convert_radolan_to_wgs84(x_radolan_coords, y_radolan_coords, prj=prj)
     wgs84_coords = np.array(wgs84_coords).T
     wgs84_coords = np.flip(wgs84_coords, axis=1)
 
@@ -80,7 +94,8 @@ def get_wgs84_grid():
 def read_radar_data(start_date: datetime, end_date: datetime) -> tuple[np.ndarray, np.ndarray]:
     start_year = start_date.year
     end_year = end_date.year
-    path = Path("F:\\radar_data")
+    path = PATH_TO_UNCOMPRESSED_DATA
+
 
     path_list = []
     for year in range(start_year, end_year+1):
@@ -130,7 +145,7 @@ def print_uncompressed_filesize():
     start_time = time.perf_counter()
 
     path_list = []
-    path = Path("F:\\radar_data")
+    path = PATH_TO_UNCOMPRESSED_DATA
     for year in range(2006, 2023+1):
         path_list.append(path.joinpath(str(year)))
     
@@ -230,7 +245,5 @@ def get_germany_mask():
 
 
 if __name__ == '__main__':
-    mask = get_NRW_mask()
-    from matplotlib import pyplot as plt    
-    plt.imshow(mask, origin='lower')
-    plt.show()
+    print('This file is not meant to be executed directly.')
+    exit()
