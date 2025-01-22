@@ -28,10 +28,11 @@ def decompress_dataset(source_dir, target_dir):
     print('Decompressing dataset - This takes a while...')
     for root, _, files in os.walk(source_dir):
         for file in files:
-            if file.endswith('.npz') and '2024' in file:
+            if file.endswith('.npz'):
 
                 # load the npz file
                 npz_file = os.path.join(root, file)
+                print('Decompressing', npz_file, '...')
                 data = np.load(npz_file, allow_pickle=True)
 
                 # create the target directories if they do not exist
@@ -102,7 +103,7 @@ def decrease_resolution_of_specific_year(dir):
 
 
 if __name__ == '__main__':
-    decompress_dataset(source_dir='compressed_data\\', target_dir='F:\\radar_data')
-    decrease_resolution_of_specific_year(dir='F:\\radar_data\\2023')
+    #decompress_dataset(source_dir='compressed_data\\', target_dir='F:\\radar_data')
+    #decrease_resolution_of_specific_year(dir='F:\\radar_data\\2023')
     decrease_resolution_of_specific_year(dir='F:\\radar_data\\2024')
     print('Done!')
