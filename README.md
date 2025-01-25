@@ -26,6 +26,4 @@ First, uncomment the `create_daily_precipitation_file()` at the bottom of `main.
 - About 400GB of free disk space
 - A CUDA capable GPU
 
-![Radar Animation](results/radar_data.gif)
-
 ![CPD Animation](CPD.gif)
