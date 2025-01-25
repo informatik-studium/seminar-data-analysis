@@ -5,7 +5,7 @@ import json
 from scipy.signal import convolve2d
 
 
-def plot_state_borders_on_axis(ax=plt, state_annotations=True, color="black"):
+def plot_state_borders_on_axis(ax=plt, state_annotations=True, color="black", only_NRW=False):
     states_abbreviation_lookup = {
         "Baden-Württemberg": "BW",
         "Bayern": "BY",
@@ -30,6 +30,8 @@ def plot_state_borders_on_axis(ax=plt, state_annotations=True, color="black"):
     data = data["features"]
     for state_data in data:
         state_name = state_data["properties"]["name"]
+        if only_NRW and state_name != 'Nordrhein-Westfalen':
+            continue
         poly_type = state_data["geometry"]["type"]
         state_polygons = state_data["geometry"]["coordinates"]
         if poly_type == 'Polygon':
@@ -102,3 +104,6 @@ def plot_topological_map():
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
     plt.show()
+
+if __name__ == '__main__':
+    plot_topological_map()

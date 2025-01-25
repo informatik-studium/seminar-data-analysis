@@ -11,6 +11,16 @@ In order to reproduce any analysis, the dataset has to be prepared by decompress
 ## Settings the path
 After the data set has been prepared, all data accesses are carried out via a central method (`util.read_radar_data`). The correct path to the unpacked data can be set at the top of the `util.py` file. This variable is called `PATH_TO_UNCOMPRESSED_DATA` and has to be a `Path`-object (from `pathlib`).
 
+## Recreating the basic figures
+First, uncomment the `create_basic_figures()` call at the bottom of the `main.py` and then run it. This could take a relatively long time.
+
+## Creating a GIF animation of raw data
+First, uncomment the `create_gif()` call at the bottom of the `main.py` and then run it.
+
+## Create a CPD animation
+First, uncomment the `create_daily_precipitation_file()` call at the bottom of the `main.py`. Afterwards, run the `cumulative_precipitation_with_decay.py` file. Note: dont interact with the pyplot window. This could take a relatively long time.
+
+
 ## Hardware Requirements
 - At least 32GB of RAM
 - About 400GB of free disk space

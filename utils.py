@@ -149,7 +149,7 @@ def print_uncompressed_filesize():
 
     path_list = []
     path = PATH_TO_UNCOMPRESSED_DATA
-    for year in range(2006, 2023+1):
+    for year in range(2006, 2024+1):
         path_list.append(path.joinpath(str(year)))
     
     files = []
