@@ -33,7 +33,7 @@ def CPWD_step(precipitation, prev_CPWD, result, decay, current_step):
         prec = np.float32(0)
     result[i, j] = prev_CPWD[i, j] * decay + precipitation[current_step, i, j]
 
-def CPWD(decay=0.95, gif=False, save=False):
+def CPWD(start_datetime, decay=0.95, gif=True, save=False, fps=8):
 
     # load precipitation data to the GPU
     precipitation = np.load('daily_precipitation.npy').astype(np.float32)
@@ -63,7 +63,6 @@ def CPWD(decay=0.95, gif=False, save=False):
                 os.remove(f"tmp/mean_frames/{filename}")
 
     # loop through the precipitation data and calculate the cumulative precipitation with decay
-    start_datetime = datetime(2006, 1, 1)
     plt.rcParams["figure.figsize"] = (12, 10)
     plt.ion()
     grid = get_wgs84_grid()
@@ -133,7 +132,7 @@ def CPWD(decay=0.95, gif=False, save=False):
         images = []
         for filename in os.listdir("tmp/gif_frames"):
             images.append(imageio.imread(f"tmp/gif_frames/{filename}"))
-        imageio.mimsave('CPD.gif', images, fps=8)
+        imageio.mimsave('CPD.gif', images, fps=fps)
 
         print("\tCreated gif. Cleaning up...")
 
@@ -194,4 +193,4 @@ def CPWD(decay=0.95, gif=False, save=False):
 
 
 if __name__ == '__main__':
-    CPWD(gif=True, save=True)
+    CPWD(start_datetime=datetime(2024, 1, 1))
