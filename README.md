@@ -18,7 +18,7 @@ First, uncomment the `create_basic_figures()` call at the bottom of the `main.py
 First, uncomment the `create_gif()` call at the bottom of the `main.py` and then run it.
 
 ## Create a CPD animation
-First, uncomment the `create_daily_precipitation_file()` call at the bottom of the `main.py`. Afterwards, run the `cumulative_precipitation_with_decay.py` file. Note: dont interact with the pyplot window. This could take a relatively long time.
+First, uncomment the `create_daily_precipitation_file()`, set a range of dates and call at the bottom of the `main.py`. Afterwards, set the correct starting date and run the `cumulative_precipitation_with_decay.py` file. This could take a relatively long time. Note: dont interact with the pyplot window.
 
 
 ## Hardware Requirements
