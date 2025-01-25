@@ -11,4 +11,9 @@ In order to reproduce any analysis, the dataset has to be prepared by decompress
 ## Settings the path
 After the data set has been prepared, all data accesses are carried out via a central method (`util.read_radar_data`). The correct path to the unpacked data can be set at the top of the `util.py` file. This variable is called `PATH_TO_UNCOMPRESSED_DATA` and has to be a `Path`-object (from `pathlib`).
 
+## Hardware Requirements
+- At least 32GB of RAM
+- About 400GB of free disk space
+- A CUDA capable GPU
+
 ![Radar Animation](results/radar_data.gif)
