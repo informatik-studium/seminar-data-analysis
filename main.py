@@ -370,13 +370,11 @@ def compute_daily_precipitation(year_month_mean_tuple):
         daily_precip = np.nansum(radar_data.reshape(days, 24, 900, 900), axis=1) # sum over time
     print(f"Year: {year}, Month: {month}, Worker return shape: {daily_precip.shape}")
     return year, month, daily_precip
-def create_daily_precipitation_file(max_parallel_processes=6, mean_over_area=False):
+def create_daily_precipitation_file(years, max_parallel_processes=6, mean_over_area=False):
     """Compute and plot average monthly precipitation per square meter."""
     start_time = time.perf_counter()
 
     # Prepare tasks
-    years = range(2006, 2024) # all years
-    #years = range(2023, 2025) # less
     months = range(1, 13)
     tasks = [(year, month, mean_over_area) for year in years for month in months]
 
@@ -426,6 +424,6 @@ if __name__ == "__main__":
 
     #create_basic_figures()
 
-    #create_daily_precipitation_file()
+    #create_daily_precipitation_file(years=range(2006, 2025))
 
     pass
