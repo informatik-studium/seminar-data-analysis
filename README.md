@@ -27,3 +27,5 @@ First, uncomment the `create_daily_precipitation_file()`, set a range of dates a
 - A CUDA capable GPU
 
 ![Radar Animation](results/radar_data.gif)
+
+![CPD Animation](CPD.gif)
