@@ -5,6 +5,14 @@
 >Institute of Technologies and Management of the Digital Transformation<br>
 >Sumbitted for the seminar "Selected Topics in Data-Science" 2025
 
+![GIF](results/CPD.gif)
+
+# Paper
+[Here](paper.pdf) is the final paper.
+
+# Recreating Results
+The following paragraphs briefly describe how to reconstruct the results and graphics of the paper.
+
 ## Preparing the Dataset
 In order to reproduce any analysis, the dataset has to be prepared by decompressing and homogenizing the resolution. This can be done by executing `prepare_dataset.py`. You just have to change the paths and the bottom of the file before. The data set is thereby inflated from around `10GB` to around `400GB`.
 
